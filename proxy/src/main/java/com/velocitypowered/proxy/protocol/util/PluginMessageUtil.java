@@ -65,7 +65,7 @@ public final class PluginMessageUtil {
   public static boolean isMcBrand(PluginMessagePacket message) {
     checkNotNull(message, "message");
     return message.getChannel().equals(BRAND_CHANNEL_LEGACY) || message.getChannel()
-        .equals(BRAND_CHANNEL);
+            .equals(BRAND_CHANNEL);
   }
 
   /**
@@ -77,7 +77,7 @@ public final class PluginMessageUtil {
   public static boolean isRegister(PluginMessagePacket message) {
     checkNotNull(message, "message");
     return message.getChannel().equals(REGISTER_CHANNEL_LEGACY) || message.getChannel()
-        .equals(REGISTER_CHANNEL);
+            .equals(REGISTER_CHANNEL);
   }
 
   /**
@@ -89,35 +89,59 @@ public final class PluginMessageUtil {
   public static boolean isUnregister(PluginMessagePacket message) {
     checkNotNull(message, "message");
     return message.getChannel().equals(UNREGISTER_CHANNEL_LEGACY) || message.getChannel()
-        .equals(UNREGISTER_CHANNEL);
+            .equals(UNREGISTER_CHANNEL);
   }
 
-  private static final QuietDecoderException ILLEGAL_CHANNEL = new QuietDecoderException("Illegal channel");
+  private static final QuietDecoderException ILLEGAL_CHANNEL =
+          new QuietDecoderException("Illegal channel");
 
   /**
    * Fetches all the channels in a register or unregister plugin message.
    *
    * @param existingChannels the number of channels already registered
-   * @param message the message to get the channels from
+   * @param message the plugin message
    * @return the channels, as an immutable list
    */
-  public static List<ChannelIdentifier> getChannels(int existingChannels,
-                                                    PluginMessagePacket message,
-                                                    ProtocolVersion protocolVersion) {
+  public static List<ChannelIdentifier> getChannels(
+          int existingChannels,
+          PluginMessagePacket message,
+          ProtocolVersion protocolVersion) {
+
     checkNotNull(message, "message");
-    checkArgument(isRegister(message) || isUnregister(message), "Unknown channel type %s",
-        message.getChannel());
+
+    checkArgument(
+            isRegister(message) || isUnregister(message),
+            "Unknown channel type %s",
+            message.getChannel()
+    );
+
     if (!message.content().isReadable()) {
-      // If we try to split this, we will get an one-element array with the empty string, which
+      // If we try to split this, we will get a one-element array with the empty string, which
       // has caused issues with 1.13+ compatibility. Just return an empty list.
       return ImmutableList.of();
     }
+
     String payload = message.content().toString(StandardCharsets.UTF_8);
-    checkArgument(payload.length() <= Short.MAX_VALUE, "payload too long: %s", payload.length());
+
+    checkArgument(
+            payload.length() <= Short.MAX_VALUE,
+            "payload too long: %s",
+            payload.length()
+    );
+
     String[] channels = payload.split("\0");
-    checkArgument(existingChannels + channels.length <= ConnectedPlayer.MAX_CLIENTSIDE_PLUGIN_CHANNELS,
-        "too many channels: %s + %s > %s", existingChannels, channels.length, ConnectedPlayer.MAX_CLIENTSIDE_PLUGIN_CHANNELS);
-    ImmutableList.Builder<ChannelIdentifier> channelIdentifiers = ImmutableList.builderWithExpectedSize(channels.length);
+
+    checkArgument(
+            existingChannels + channels.length <= ConnectedPlayer.MAX_CLIENTSIDE_PLUGIN_CHANNELS,
+            "too many channels: %s + %s > %s",
+            existingChannels,
+            channels.length,
+            ConnectedPlayer.MAX_CLIENTSIDE_PLUGIN_CHANNELS
+    );
+
+    ImmutableList.Builder<ChannelIdentifier> channelIdentifiers =
+            ImmutableList.builderWithExpectedSize(channels.length);
+
     try {
       for (String channel : channels) {
         if (protocolVersion.noLessThan(ProtocolVersion.MINECRAFT_1_13)) {
@@ -133,6 +157,7 @@ public final class PluginMessageUtil {
         throw ILLEGAL_CHANNEL;
       }
     }
+
     return channelIdentifiers.build();
   }
 
@@ -143,57 +168,85 @@ public final class PluginMessageUtil {
    * @param channels        the channels to register
    * @return the plugin message to send
    */
-  public static PluginMessagePacket constructChannelsPacket(ProtocolVersion protocolVersion,
-                                                            Collection<ChannelIdentifier> channels) {
+  public static PluginMessagePacket constructChannelsPacket(
+          ProtocolVersion protocolVersion,
+          Collection<ChannelIdentifier> channels) {
+
     checkNotNull(channels, "channels");
     checkArgument(!channels.isEmpty(), "no channels specified");
-    String channelName = protocolVersion.noLessThan(ProtocolVersion.MINECRAFT_1_13)
-        ? REGISTER_CHANNEL : REGISTER_CHANNEL_LEGACY;
+
+    String channelName =
+            protocolVersion.noLessThan(ProtocolVersion.MINECRAFT_1_13)
+                    ? REGISTER_CHANNEL
+                    : REGISTER_CHANNEL_LEGACY;
+
     ByteBuf contents = Unpooled.buffer();
-    contents.writeCharSequence(joinChannels(channels), StandardCharsets.UTF_8);
+    contents.writeCharSequence(
+            joinChannels(channels),
+            StandardCharsets.UTF_8
+    );
+
     return new PluginMessagePacket(channelName, contents);
   }
 
   private static String joinChannels(Collection<ChannelIdentifier> channels) {
     checkNotNull(channels, "channels");
     checkArgument(!channels.isEmpty(), "no channels specified");
+
     StringBuilder sb = new StringBuilder();
     Iterator<ChannelIdentifier> iterator = channels.iterator();
+
     while (iterator.hasNext()) {
       ChannelIdentifier channel = iterator.next();
       sb.append(channel.getId());
+
       if (iterator.hasNext()) {
         sb.append('\0');
       }
     }
+
     return sb.toString();
   }
 
   /**
-   * Rewrites the brand message to indicate the presence of Velocity.
+   * Rewrites the brand message to indicate the presence of Usva.
    *
    * @param message the plugin message
    * @param version the proxy version
    * @return the rewritten plugin message
    */
-  public static PluginMessagePacket rewriteMinecraftBrand(PluginMessagePacket message,
-                                                          ProxyVersion version,
-                                                          ProtocolVersion protocolVersion) {
+  public static PluginMessagePacket rewriteMinecraftBrand(
+          PluginMessagePacket message,
+          ProxyVersion version,
+          ProtocolVersion protocolVersion) {
+
     checkNotNull(message, "message");
     checkNotNull(version, "version");
-    checkArgument(isMcBrand(message), "message is not a brand plugin message");
+    checkArgument(
+            isMcBrand(message),
+            "message is not a brand plugin message"
+    );
 
     String currentBrand = readBrandMessage(message.content());
-    String rewrittenBrand = String.format("%s (%s)", currentBrand, version.getName());
+
+    // Changed from Velocity to Usva
+    String rewrittenBrand = String.format("%s (Usva)", currentBrand);
 
     ByteBuf rewrittenBuf = Unpooled.buffer();
+
     if (protocolVersion.noLessThan(ProtocolVersion.MINECRAFT_1_8)) {
       ProtocolUtils.writeString(rewrittenBuf, rewrittenBrand);
     } else {
-      rewrittenBuf.writeCharSequence(rewrittenBrand, StandardCharsets.UTF_8);
+      rewrittenBuf.writeCharSequence(
+              rewrittenBrand,
+              StandardCharsets.UTF_8
+      );
     }
 
-    return new PluginMessagePacket(message.getChannel(), rewrittenBuf);
+    return new PluginMessagePacket(
+            message.getChannel(),
+            rewrittenBuf
+    );
   }
 
   /**
@@ -213,7 +266,8 @@ public final class PluginMessageUtil {
     }
   }
 
-  private static final Pattern INVALID_IDENTIFIER_REGEX = Pattern.compile("[^a-z0-9\\-_]*");
+  private static final Pattern INVALID_IDENTIFIER_REGEX =
+          Pattern.compile("[^a-z0-9\\-_]*");
 
   /**
    * Transform a plugin message channel from a "legacy" (less than 1.13) form to a modern one.
@@ -234,15 +288,19 @@ public final class PluginMessageUtil {
       case REGISTER_CHANNEL_LEGACY -> REGISTER_CHANNEL;
       case UNREGISTER_CHANNEL_LEGACY -> UNREGISTER_CHANNEL;
       case BRAND_CHANNEL_LEGACY -> BRAND_CHANNEL;
+
       // This is a special historical case we are compelled to support for the benefit of
       // BungeeQuack.
       case "BungeeCord" -> "bungeecord:main";
+
       default -> {
         // This is very likely a legacy name, so transform it. Velocity uses the same scheme as
         // BungeeCord does to transform channels, but also removes clearly invalid characters as
         // well.
         final String lower = name.toLowerCase(Locale.ROOT);
-        yield "legacy:" + INVALID_IDENTIFIER_REGEX.matcher(lower).replaceAll("");
+
+        yield "legacy:"
+                + INVALID_IDENTIFIER_REGEX.matcher(lower).replaceAll("");
       }
     };
   }
